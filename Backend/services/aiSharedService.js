@@ -15,7 +15,12 @@ const cleanAndParseJSON = (result) => {
     cleaned = cleaned.substring(start, end + 1);
   }
 
-  return JSON.parse(cleaned);
+  try {
+    return JSON.parse(cleaned);
+  } catch (error) {
+    console.error("Failed to parse Gemini JSON:", error.message);
+    throw new Error("AI returned an unexpected format. Please try again.");
+  }
 };
 
 const analyzeCV = async (jobDescription, resume) => {
@@ -40,6 +45,14 @@ Rules:
 - Do not invent experience, fake tools, certifications, or metrics.
 - Be honest about gaps.
 - Use the job description requirements to evaluate fit.
+- This is an estimated match score, not a real ATS system score.
+- Score conservatively. Do not inflate the score to encourage applying.
+- Separate direct evidence, transferable evidence, true gaps, and claims the candidate should not make.
+- A direct match means the resume explicitly supports the requirement.
+- A transferable match means the resume shows related experience, but not direct experience with the exact requirement.
+- A true gap means the resume does not provide enough support.
+- doNotClaim must list job requirements, tools, domains, certifications, or metrics the candidate should not claim in applications or interviews.
+- claimsToVerifyBeforeApplying must list any claim that may be useful but needs the candidate to personally confirm before using.
 
 Scoring Method:
 Start from 50%.
@@ -61,12 +74,17 @@ Return only this JSON:
 
 {
   "decision": "APPLY | APPLY_WITH_CAUTION | SKIP",
-  "matchScore": "percentage",
+  "matchScore": "estimated percentage",
   "fitSummary": "Two-line recruiter evaluation.",
   "targetRole": "",
   "targetIndustry": "",
   "strengths": [],
   "gaps": [],
+  "directMatches": [],
+  "transferableMatches": [],
+  "trueGaps": [],
+  "doNotClaim": [],
+  "claimsToVerifyBeforeApplying": [],
   "matchedKeywords": [],
   "missingKeywords": [],
   "strategy": {
@@ -171,14 +189,24 @@ Critical Rules:
 - Always return professionalExperience as an array of objects.
 - Always return education as an array of objects.
 - Use job description keywords naturally, but only when they are supported by the candidate resume or clearly transferable.
+- Use job description keywords only when directly supported by the resume.
+- If a keyword is only transferable, mention the transferable experience without claiming direct experience with that keyword.
+- Do not convert transferable experience into direct experience.
+- Prefer rewriting existing responsibilities over creating new responsibilities.
+- Do not add a new responsibility just because it appears in the job description.
 - Keep the candidate truthful and ATS-friendly.
 - Tailor the headline, summary, skills, and bullets to the target job.
 - Resume bullets must be impact-driven.
+- Every resume bullet must pass this test: could the candidate confidently explain this in an interview using only their real experience?
+- If a bullet does not pass that test, rewrite it more conservatively or omit it.
 - If exact metrics are not provided, write strong impact statements without fake numbers.
-- Most recent role should have 5–7 bullets.
-- Older roles should have 3–5 bullets.
+- Use 3-6 bullets per role depending on available resume evidence and job relevance.
+- Do not force extra bullets if the resume does not provide enough evidence.
+- Prioritize fewer, defensible bullets over more impressive but weaker bullets.
 - Avoid repeated bullet wording.
 - If the job requires domain experience the candidate does not have, position related transferable experience honestly in the summary or bullets, but do not add unsupported tools as skills.
+- If the CV analysis includes doNotClaim or trueGaps, do not include those items as skills, direct experience, tools, certifications, achievements, or metrics.
+- If the CV analysis includes claimsToVerifyBeforeApplying, only include those claims if they are clearly present in the original candidate resume.
 
 Contact Rules:
 - Extract contact details from the candidate resume only.
@@ -207,6 +235,7 @@ Summary Rules:
 - Mention measurable achievements only if present in the candidate resume.
 - Do not overfit the summary to tools or platforms that are not in the candidate resume.
 - If the job has tools the candidate has not used, describe transferable experience instead of claiming tool experience.
+- Do not use phrases like "proven track record", "dynamic", "passionate", "synergy", "results-oriented", or "leverage" unless they sound natural and are clearly supported.
 
 Skills Rules:
 - Return 14–20 skills maximum.
@@ -215,6 +244,7 @@ Skills Rules:
 - Do not include phrases like "eager to learn", "eager to leverage", "transferable skills", or "familiar with".
 - Do not include unsupported tools, platforms, or software unless they appear in the candidate resume.
 - If a job tool is not in the candidate resume, do not add it as a skill.
+- If a skill is only transferable, use the broader supported skill instead of the exact unsupported job keyword.
 - Skills should be clean noun phrases such as:
   "Business Analysis", "Requirements Gathering", "SDLC", "UAT", "Stakeholder Management".
 - Avoid duplicate skills or near-duplicates.
@@ -235,6 +265,9 @@ For each role:
 - Do not create fake dates.
 - Do not create fake locations.
 - Do not create fake job titles.
+- Preserve the meaning of the candidate's original responsibilities.
+- Do not imply ownership, leadership, implementation, management, or hands-on tool experience unless the resume supports it.
+- If the candidate only supported, assisted, coordinated, documented, or participated in something, keep that level of ownership.
 - Keep role order the same as the candidate resume, most recent first.
 - Do not remove older roles unless the candidate resume has too many roles and the role is irrelevant.
 - Preserve important technical and business achievements from the original resume.
@@ -327,10 +360,10 @@ Rules:
 - Do not include markdown.
 - Generate only the cover letter.
 - Cover letter must be first person.
-- Cover letter must be between 120 and 150 words.
+- Cover letter should be between 100 and 160 words.
 - Count the words before responding.
-- If the cover letter is under 120 words, expand it.
-- If the cover letter is over 150 words, shorten it.
+- If the cover letter is under 100 words, expand it only with supported evidence.
+- If the cover letter is over 160 words, shorten it.
 - Do not mention the word count in the response.
 - Cover letter must NOT start with "I am writing", "I am excited to apply", "I am writing to express", or "I am excited to express".
 - Start with a strong, direct sentence about the candidate's value.
@@ -342,14 +375,21 @@ Rules:
 - Do not sound generic.
 - Do not overuse buzzwords.
 - If the candidate does not have direct domain experience, position transferable experience honestly.
+- Do not oversell. Sound confident but grounded.
+- Do not claim direct experience with any tool, platform, domain, or responsibility unless it is clearly present in the candidate resume.
+- If experience is transferable, phrase it as transferable experience instead of direct experience.
+- Avoid phrases like "proven track record", "dynamic", "passionate", "synergy", "results-oriented", and "leverage".
+- The letter should sound like a real candidate, not a generic corporate template.
+- Do not include greeting, date, address block, sign-off, or signature. Return only the body text; the frontend formats the letter.
 
 Final check before responding:
 - The response must be valid JSON.
-- The cover letter must be 120–150 words.
+- The cover letter must be 100-160 words.
 - The cover letter must be written in first person.
 - The cover letter must not invent experience.
 - The first sentence must not start with "I am writing", "I am excited", "I am writing to express", or "I am excited to express".
 - Before responding, check the first 5 words of the cover letter. If they include "I am writing" or "I am excited", rewrite the opening.
+- Before responding, check every claim and remove anything the candidate could not defend in an interview.
 
 Return only this JSON:
 
@@ -400,6 +440,12 @@ Rules:
 - If the candidate has a gap, show how to answer it honestly using transferable experience.
 - whatToSay must be spoken in first person by the candidate.
 - questionsToAskEmployer must be thoughtful and relevant to the role.
+- Do not help the candidate claim experience they do not have.
+- If the CV analysis includes doNotClaim, explicitly warn the candidate not to claim those items.
+- If the CV analysis includes trueGaps, show how to discuss those gaps honestly.
+- Recruiter messages must be concise, natural, and under 80 words.
+- Recruiter messages must not sound desperate.
+- Recruiter messages must not claim qualifications not present in the resume.
 
 Return only this JSON:
 
@@ -411,8 +457,14 @@ Return only this JSON:
     }
   ],
   "candidatePitch": "",
+  "thirtySecondPitch": "",
+  "recruiterMessage": "",
+  "linkedinMessage": "",
+  "emailSubject": "",
   "weaknessHandling": "",
-  "questionsToAskEmployer": []
+  "questionsToAskEmployer": [],
+  "claimsToAvoid": [],
+  "claimsToVerifyBeforeApplying": []
 }
 `;
 

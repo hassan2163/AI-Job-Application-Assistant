@@ -1,8 +1,16 @@
 const { GoogleGenAI } = require("@google/genai");
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
+const getGeminiClient = () => {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error(
+      "GEMINI_API_KEY is missing. Add it to Backend/.env before generating AI content."
+    );
+  }
+
+  return new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+  });
+};
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -32,6 +40,8 @@ const generateContent = async (prompt, options = {}) => {
     try {
       console.log(`Gemini request attempt ${attempt}/${retries}`);
 
+      const ai = getGeminiClient();
+
       const response = await ai.models.generateContent({
         model,
         contents: prompt,
@@ -51,6 +61,10 @@ const generateContent = async (prompt, options = {}) => {
       return text;
     } catch (error) {
       console.error(`Gemini attempt ${attempt} failed:`, error.message);
+
+      if ((error.message || "").includes("GEMINI_API_KEY")) {
+        throw error;
+      }
 
       const canRetry = isRetryableGeminiError(error);
       const isLastAttempt = attempt === retries;

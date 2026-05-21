@@ -33,8 +33,83 @@ The application is designed to support users during the job search process by pr
 - Node.js
 - Express.js
 - Axios
-- Google Gemini API / AI model integration
-- File system-based resume input
+- AI model integration
+- File upload-based resume input
+
+---
+
+## Local Development
+
+Run the backend:
+
+```bash
+cd Backend
+npm install
+npm run dev
+```
+
+Run the frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend local environment:
+
+```bash
+VITE_API_URL=http://localhost:5000
+```
+
+Backend local environment:
+
+```bash
+PORT=5000
+FRONTEND_URL=http://localhost:5173
+GEMINI_API_KEY=your_api_key_here
+```
+
+---
+
+## Deployment
+
+Recommended MVP deployment:
+
+- Frontend: GitHub Pages
+- Backend: Render Web Service
+
+GitHub Pages frontend:
+
+1. In GitHub, set repository secret `VITE_API_URL` to your Render backend URL.
+2. Example:
+
+```bash
+VITE_API_URL=https://your-render-backend.onrender.com
+```
+
+3. Enable GitHub Pages with GitHub Actions as the source.
+4. Push to `main`. The workflow in `.github/workflows/deploy-frontend.yml` builds and deploys `frontend/dist`.
+
+Render backend:
+
+1. Create a new Render Web Service from this repo.
+2. Use the included `render.yaml` blueprint or configure manually:
+
+```bash
+Root Directory: Backend
+Build Command: npm install
+Start Command: npm start
+```
+
+3. Add Render environment variables:
+
+```bash
+GEMINI_API_KEY=your_real_api_key
+FRONTEND_URL=https://hassan2163.github.io
+```
+
+Render provides `PORT` automatically. The backend already uses `process.env.PORT || 5000`.
 
 ---
 

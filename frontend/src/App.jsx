@@ -1,15 +1,46 @@
 import { useState } from "react";
-import jsPDF from "jspdf";
-import { saveAs } from "file-saver";
-import {
-  AlignmentType,
-  BorderStyle,
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-} from "docx";
 import "./App.css";
+
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+
+const RESUME_STYLES = [
+  {
+    id: "classic",
+    name: "Classic ATS",
+    description: "Clean black-and-white format for conservative applications.",
+    accent: "#111827",
+    docxAccent: "111827",
+    font: "Arial",
+    bullet: "-",
+  },
+  {
+    id: "modern",
+    name: "Modern Blue",
+    description: "Polished accent style for tech, analyst, and product roles.",
+    accent: "#2563eb",
+    docxAccent: "2563EB",
+    font: "Arial",
+    bullet: "-",
+  },
+  {
+    id: "executive",
+    name: "Executive",
+    description: "Sharper section rhythm for senior and client-facing roles.",
+    accent: "#0f766e",
+    docxAccent: "0F766E",
+    font: "Georgia",
+    bullet: "-",
+  },
+  {
+    id: "compact",
+    name: "Compact",
+    description: "Tighter spacing when you need to keep content concise.",
+    accent: "#7c2d12",
+    docxAccent: "7C2D12",
+    font: "Arial",
+    bullet: "-",
+  },
+];
 
 function App() {
   const [jobDescription, setJobDescription] = useState("");
@@ -18,11 +49,44 @@ function App() {
   const [activeTab, setActiveTab] = useState("analysis");
   const [loadingAction, setLoadingAction] = useState("");
   const [error, setError] = useState("");
+  const [resumeStyle, setResumeStyle] = useState("modern");
+
+  const activeResumeStyle =
+    RESUME_STYLES.find((style) => style.id === resumeStyle) || RESUME_STYLES[0];
+
+  const goToWorkspaceTab = (tabId) => {
+    setActiveTab(tabId);
+
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("results-workspace")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const goToTemplates = () => {
+    setActiveTab("tailoredResume");
+
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("resume-templates")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
 
   const handleAction = async (endpoint, actionName, tabToOpen) => {
+    let timeoutId;
+
     try {
       setError("");
       setResult(null);
+
+      if (!API_BASE_URL) {
+        setError(
+          "Frontend API URL is not configured. Add VITE_API_URL to frontend/.env using frontend/.env.example."
+        );
+        return;
+      }
 
       if (!jobDescription.trim()) {
         setError("Please paste the job description first.");
@@ -41,16 +105,20 @@ function App() {
       setLoadingAction(actionName);
       setActiveTab(tabToOpen);
 
-      const response = await fetch(`http://localhost:3000/api/${endpoint}`, {
+      const controller = new AbortController();
+      timeoutId = window.setTimeout(() => controller.abort(), 120000);
+
+      const response = await fetch(`${API_BASE_URL}/api/${endpoint}`, {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       });
 
       const contentType = response.headers.get("content-type");
 
       if (!contentType || !contentType.includes("application/json")) {
         throw new Error(
-          "Backend did not return JSON. Make sure backend is running on http://localhost:3000."
+          "Backend did not return JSON. Make sure the backend is running and VITE_API_URL points to it."
         );
       }
 
@@ -62,12 +130,22 @@ function App() {
 
       setResult(data);
     } catch (err) {
-      console.error(err);
+      if (err.name === "AbortError") {
+        setError(
+          "The request timed out while AI was generating. Please try again with a shorter resume or job description."
+        );
+        return;
+      }
+
       setError(
         err.message ||
-          "Unable to connect to backend. Make sure backend is running on port 3000."
+          "Unable to connect to the backend. Make sure it is running and the frontend .env API URL is correct."
       );
     } finally {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+
       setLoadingAction("");
     }
   };
@@ -170,7 +248,7 @@ function App() {
   };
 
   const getSummaryValue = (keys) => {
-    if (!result) return "—";
+    if (!result) return "-";
 
     const actualResult = result.data || result.result || result.output || result;
 
@@ -186,12 +264,31 @@ function App() {
       }
     }
 
-    return "—";
+    return "-";
   };
 
   const hasSection = (sectionName) => {
     return Boolean(getSectionContent(sectionName));
   };
+
+  const getResultErrors = () => {
+    if (!result || !Array.isArray(result.errors)) return [];
+    return result.errors;
+  };
+
+  const hexToRgb = (hex) => {
+    const normalized = hex.replace("#", "");
+    const value = parseInt(normalized, 16);
+
+    return {
+      r: (value >> 16) & 255,
+      g: (value >> 8) & 255,
+      b: value & 255,
+    };
+  };
+
+  const getCompletedSectionCount = () =>
+    tabs.filter((tab) => hasSection(tab.id)).length;
 
   const cleanPdfText = (text = "") => {
     return String(text)
@@ -427,6 +524,110 @@ function App() {
     return { resume, contactInfo };
   };
 
+  const getCandidateContactInfo = async () => {
+    let uploadedResumeText = "";
+
+    if (resumeFile) {
+      uploadedResumeText = await resumeFile.text();
+    }
+
+    const extractedContact = extractContactFromText(uploadedResumeText);
+    const tailoredResume = normalizeTailoredResume(getSectionContent("tailoredResume"));
+    const responseContact =
+      tailoredResume?.contact && typeof tailoredResume.contact === "object"
+        ? tailoredResume.contact
+        : {};
+
+    return {
+      fullName:
+        cleanPdfText(getValue(responseContact, ["fullName", "name"])) ||
+        extractedContact.fullName ||
+        "[Full Name]",
+
+      location:
+        cleanPdfText(getValue(responseContact, ["location", "address"])) ||
+        extractedContact.location ||
+        "[Location]",
+
+      phone:
+        cleanPdfText(getValue(responseContact, ["phone", "phoneNumber"])) ||
+        extractedContact.phone ||
+        "[Phone]",
+
+      email:
+        cleanPdfText(getValue(responseContact, ["email", "emailAddress"])) ||
+        extractedContact.email ||
+        "[Email]",
+
+      linkedin:
+        cleanPdfText(getValue(responseContact, ["linkedin", "linkedIn"])) ||
+        extractedContact.linkedin ||
+        "[LinkedIn]",
+    };
+  };
+
+  const extractHiringContactName = (text = "") => {
+    const patterns = [
+      /(?:hiring manager|recruiter|contact|reports to|send to)[:\s-]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})/,
+      /dear\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+
+      if (match?.[1]) {
+        const name = cleanPdfText(match[1]);
+        const lower = name.toLowerCase();
+
+        if (!["hiring manager", "recruiter", "candidate"].includes(lower)) {
+          return name;
+        }
+      }
+    }
+
+    return "";
+  };
+
+  const normalizeCoverLetterText = (content) => {
+    const raw =
+      typeof content === "string"
+        ? content
+        : getValue(content, ["coverLetter", "letter", "body", "content"]);
+
+    return cleanPdfText(raw)
+      .replace(/^dear\s+[^,]+,?\s*/i, "")
+      .replace(/(?:sincerely|regards|best regards),?\s*.*$/i, "")
+      .trim();
+  };
+
+  const getCoverLetterDataForDownload = async () => {
+    const coverLetterContent = getSectionContent("coverLetter");
+
+    if (!coverLetterContent) {
+      alert("No cover letter available yet. Please generate the cover letter first.");
+      return null;
+    }
+
+    const letterBody = normalizeCoverLetterText(coverLetterContent);
+
+    if (!letterBody) {
+      alert("The cover letter content is empty. Please generate it again.");
+      return null;
+    }
+
+    const contactInfo = await getCandidateContactInfo();
+    const hiringContactName = extractHiringContactName(jobDescription);
+
+    return {
+      contactInfo,
+      greeting: hiringContactName
+        ? `Dear ${hiringContactName},`
+        : "Dear Hiring Manager,",
+      letterBody,
+      closingName: cleanPdfText(contactInfo.fullName) || "[Full Name]",
+    };
+  };
+
   const addWrappedText = (doc, text, x, y, maxWidth, options = {}) => {
     const {
       fontStyle = "normal",
@@ -461,6 +662,8 @@ function App() {
   };
 
   const addSectionHeading = (doc, title, y, pageWidth, pageHeight, margin) => {
+    const accent = hexToRgb(activeResumeStyle.accent);
+
     if (y > pageHeight - margin - 30) {
       doc.addPage();
       y = margin;
@@ -470,16 +673,16 @@ function App() {
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10.5);
-    doc.setTextColor(0);
+    doc.setTextColor(accent.r, accent.g, accent.b);
     doc.text(title.toUpperCase(), margin, y);
 
     y += 5;
 
-    doc.setDrawColor(170);
-    doc.setLineWidth(0.5);
+    doc.setDrawColor(accent.r, accent.g, accent.b);
+    doc.setLineWidth(activeResumeStyle.id === "executive" ? 1.1 : 0.6);
     doc.line(margin, y, pageWidth - margin, y);
 
-    return y + 11;
+    return y + (activeResumeStyle.id === "compact" ? 8 : 11);
   };
 
   const addBullet = (doc, text, y, pageWidth, pageHeight, margin) => {
@@ -498,7 +701,7 @@ function App() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9.2);
     doc.setTextColor(20);
-    doc.text("•", margin, y);
+    doc.text(activeResumeStyle.bullet, margin, y);
 
     y = addWrappedText(
       doc,
@@ -525,7 +728,7 @@ function App() {
       .filter(Boolean);
 
     const skillsText =
-      cleanedSkills.length > 0 ? cleanedSkills.join("  ") : "[Skills]";
+      cleanedSkills.length > 0 ? cleanedSkills.join(" | ") : "[Skills]";
 
     return addWrappedText(doc, skillsText, margin, y, usableWidth, {
       fontSize: 9.2,
@@ -683,6 +886,7 @@ function App() {
   };
 
   const downloadTailoredResumePDF = async () => {
+    const { default: jsPDF } = await import("jspdf");
     const downloadData = await getResumeDataForDownload();
 
     if (!downloadData) return;
@@ -697,14 +901,26 @@ function App() {
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
+    const accent = hexToRgb(activeResumeStyle.accent);
 
-    const margin = 42;
+    const margin = activeResumeStyle.id === "compact" ? 34 : 42;
     const usableWidth = pageWidth - margin * 2;
-    let y = 38;
+    let y = activeResumeStyle.id === "modern" ? 48 : 38;
+
+    if (activeResumeStyle.id === "modern") {
+      doc.setFillColor(accent.r, accent.g, accent.b);
+      doc.rect(0, 0, 14, pageHeight, "F");
+    }
+
+    if (activeResumeStyle.id === "executive") {
+      doc.setDrawColor(accent.r, accent.g, accent.b);
+      doc.setLineWidth(1.4);
+      doc.line(margin, 28, pageWidth - margin, 28);
+    }
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16.5);
-    doc.setTextColor(0);
+    doc.setFontSize(activeResumeStyle.id === "compact" ? 15 : 16.5);
+    doc.setTextColor(accent.r, accent.g, accent.b);
     doc.text(cleanPdfText(contactInfo.fullName).toUpperCase(), margin, y);
 
     y += 15;
@@ -716,7 +932,7 @@ function App() {
         lineHeight: 12,
         pageHeight,
         margin,
-        color: 25,
+        color: activeResumeStyle.id === "classic" ? 25 : activeResumeStyle.accent,
       });
     }
 
@@ -840,60 +1056,63 @@ function App() {
       });
     }
 
-    doc.save("tailored-resume.pdf");
+    doc.save(`tailored-resume-${activeResumeStyle.id}.pdf`);
   };
 
-  const createDocxSectionHeading = (title) =>
-    new Paragraph({
+  const createDocxSectionHeading = (docx, title) =>
+    new docx.Paragraph({
       spacing: { before: 220, after: 90 },
       border: {
         bottom: {
-          color: "999999",
+          color: activeResumeStyle.docxAccent,
           space: 1,
-          style: BorderStyle.SINGLE,
-          size: 6,
+          style: docx.BorderStyle.SINGLE,
+          size: activeResumeStyle.id === "executive" ? 9 : 6,
         },
       },
       children: [
-        new TextRun({
+        new docx.TextRun({
           text: title.toUpperCase(),
           bold: true,
           size: 21,
-          font: "Arial",
+          font: activeResumeStyle.font,
+          color: activeResumeStyle.docxAccent,
         }),
       ],
     });
 
-  const createDocxParagraph = (text, options = {}) =>
-    new Paragraph({
+  const createDocxParagraph = (docx, text, options = {}) =>
+    new docx.Paragraph({
       spacing: { after: options.after ?? 80 },
-      alignment: options.alignment || AlignmentType.LEFT,
+      alignment: options.alignment || docx.AlignmentType.LEFT,
       children: [
-        new TextRun({
+        new docx.TextRun({
           text: cleanPdfText(text),
           bold: options.bold || false,
           italics: options.italics || false,
           size: options.size || 19,
-          font: "Arial",
+          font: activeResumeStyle.font,
           color: options.color || "000000",
         }),
       ],
     });
 
-  const createDocxBullet = (text) =>
-    new Paragraph({
+  const createDocxBullet = (docx, text) =>
+    new docx.Paragraph({
       bullet: { level: 0 },
       spacing: { after: 70 },
       children: [
-        new TextRun({
+        new docx.TextRun({
           text: cleanPdfText(text).replace(/^[-•]\s*/, ""),
           size: 19,
-          font: "Arial",
+          font: activeResumeStyle.font,
         }),
       ],
     });
 
   const downloadTailoredResumeDOCX = async () => {
+    const docx = await import("docx");
+    const { saveAs } = await import("file-saver");
     const downloadData = await getResumeDataForDownload();
 
     if (!downloadData) return;
@@ -903,15 +1122,16 @@ function App() {
     const children = [];
 
     children.push(
-      createDocxParagraph(cleanPdfText(contactInfo.fullName).toUpperCase(), {
+      createDocxParagraph(docx, cleanPdfText(contactInfo.fullName).toUpperCase(), {
         bold: true,
         size: 30,
         after: 70,
+        color: activeResumeStyle.docxAccent,
       })
     );
 
     children.push(
-      createDocxParagraph(
+      createDocxParagraph(docx, 
         resume.headline || "[Target Role / Professional Headline]",
         {
           bold: true,
@@ -931,7 +1151,7 @@ function App() {
       .join(" | ");
 
     children.push(
-      createDocxParagraph(firstContactLine, {
+      createDocxParagraph(docx, firstContactLine, {
         size: 18,
         after: 30,
         color: "333333",
@@ -939,37 +1159,37 @@ function App() {
     );
 
     children.push(
-      createDocxParagraph(contactInfo.linkedin, {
+      createDocxParagraph(docx, contactInfo.linkedin, {
         size: 18,
         after: 120,
         color: "333333",
       })
     );
 
-    children.push(createDocxSectionHeading("Professional Summary"));
+    children.push(createDocxSectionHeading(docx, "Professional Summary"));
 
     children.push(
-      createDocxParagraph(resume.professionalSummary || "[Professional Summary]", {
+      createDocxParagraph(docx, resume.professionalSummary || "[Professional Summary]", {
         size: 19,
         after: 90,
       })
     );
 
-    children.push(createDocxSectionHeading("Core Skills"));
+    children.push(createDocxSectionHeading(docx, "Core Skills"));
 
     const skillsText =
       resume.coreSkills && resume.coreSkills.length > 0
-        ? resume.coreSkills.map((skill) => cleanPdfText(skill)).join("  ")
+        ? resume.coreSkills.map((skill) => cleanPdfText(skill)).join(" | ")
         : "[Skills]";
 
     children.push(
-      createDocxParagraph(skillsText, {
+      createDocxParagraph(docx, skillsText, {
         size: 19,
         after: 100,
       })
     );
 
-    children.push(createDocxSectionHeading("Professional Experience"));
+    children.push(createDocxSectionHeading(docx, "Professional Experience"));
 
     const experienceItems =
       resume.professionalExperience && resume.professionalExperience.length > 0
@@ -986,7 +1206,7 @@ function App() {
 
     experienceItems.forEach((item) => {
       if (typeof item === "string") {
-        children.push(createDocxBullet(item));
+        children.push(createDocxBullet(docx, item));
         return;
       }
 
@@ -1009,7 +1229,7 @@ function App() {
       const metaLine = [dates, location].filter(Boolean).join(" | ");
 
       children.push(
-        createDocxParagraph(roleLine, {
+        createDocxParagraph(docx, roleLine, {
           bold: true,
           size: 19,
           after: 30,
@@ -1017,7 +1237,7 @@ function App() {
       );
 
       children.push(
-        createDocxParagraph(metaLine, {
+        createDocxParagraph(docx, metaLine, {
           size: 18,
           after: 50,
           color: "333333",
@@ -1032,25 +1252,25 @@ function App() {
         bullets.forEach((bullet) => {
           if (typeof bullet === "object") {
             const bulletText = Object.values(bullet).filter(Boolean).join(" ");
-            children.push(createDocxBullet(bulletText));
+            children.push(createDocxBullet(docx, bulletText));
           } else {
-            children.push(createDocxBullet(bullet));
+            children.push(createDocxBullet(docx, bullet));
           }
         });
       } else {
         children.push(
-          createDocxBullet("[Add impact-driven responsibility or achievement]")
+          createDocxBullet(docx, "[Add impact-driven responsibility or achievement]")
         );
       }
 
       children.push(
-        new Paragraph({
+        new docx.Paragraph({
           spacing: { after: 90 },
         })
       );
     });
 
-    children.push(createDocxSectionHeading("Education"));
+    children.push(createDocxSectionHeading(docx, "Education"));
 
     const educationItems =
       resume.education && resume.education.length > 0
@@ -1060,7 +1280,7 @@ function App() {
     educationItems.forEach((edu) => {
       if (!edu) {
         children.push(
-          createDocxParagraph(
+          createDocxParagraph(docx, 
             "[Institution] | [Degree] in [Field of Study] | [Dates]",
             {
               size: 19,
@@ -1072,7 +1292,7 @@ function App() {
 
       if (typeof edu === "string") {
         children.push(
-          createDocxParagraph(edu, {
+          createDocxParagraph(docx, edu, {
             size: 19,
           })
         );
@@ -1106,21 +1326,21 @@ function App() {
         .join(" | ");
 
       children.push(
-        createDocxParagraph(educationLine, {
+        createDocxParagraph(docx, educationLine, {
           size: 19,
         })
       );
     });
 
     if (resume.certifications && resume.certifications.length > 0) {
-      children.push(createDocxSectionHeading("Certifications"));
+      children.push(createDocxSectionHeading(docx, "Certifications"));
 
       resume.certifications.forEach((certification) => {
-        children.push(createDocxBullet(certification));
+        children.push(createDocxBullet(docx, certification));
       });
     }
 
-    const wordDocument = new Document({
+    const wordDocument = new docx.Document({
       sections: [
         {
           properties: {
@@ -1138,8 +1358,181 @@ function App() {
       ],
     });
 
-    const blob = await Packer.toBlob(wordDocument);
-    saveAs(blob, "tailored-resume.docx");
+    const blob = await docx.Packer.toBlob(wordDocument);
+    saveAs(blob, `tailored-resume-${activeResumeStyle.id}.docx`);
+  };
+
+  const downloadCoverLetterPDF = async () => {
+    const { default: jsPDF } = await import("jspdf");
+    const letterData = await getCoverLetterDataForDownload();
+
+    if (!letterData) return;
+
+    const { contactInfo, greeting, letterBody, closingName } = letterData;
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "pt",
+      format: "letter",
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 54;
+    const usableWidth = pageWidth - margin * 2;
+    const accent = hexToRgb(activeResumeStyle.accent);
+    let y = 54;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(accent.r, accent.g, accent.b);
+    doc.text(cleanPdfText(contactInfo.fullName).toUpperCase(), margin, y);
+
+    y += 16;
+
+    const contactLine = [
+      contactInfo.location,
+      contactInfo.phone,
+      contactInfo.email,
+      contactInfo.linkedin,
+    ]
+      .map((item) => cleanPdfText(item))
+      .filter(Boolean)
+      .join(" | ");
+
+    y = addWrappedText(doc, contactLine, margin, y, usableWidth, {
+      fontSize: 9,
+      lineHeight: 11.5,
+      pageHeight,
+      margin,
+      color: 45,
+    });
+
+    y += 28;
+
+    y = addWrappedText(doc, greeting, margin, y, usableWidth, {
+      fontSize: 10.5,
+      lineHeight: 14,
+      pageHeight,
+      margin,
+      color: 20,
+    });
+
+    y += 12;
+
+    const paragraphs = letterBody
+      .split(/\n{2,}|(?<=\.)\s+(?=[A-Z])/)
+      .map((paragraph) => cleanPdfText(paragraph))
+      .filter(Boolean);
+
+    paragraphs.forEach((paragraph) => {
+      y = addWrappedText(doc, paragraph, margin, y, usableWidth, {
+        fontSize: 10.2,
+        lineHeight: 14.5,
+        pageHeight,
+        margin,
+        color: 20,
+      });
+      y += 10;
+    });
+
+    y += 14;
+    y = addWrappedText(doc, "Regards,", margin, y, usableWidth, {
+      fontSize: 10.5,
+      lineHeight: 14,
+      pageHeight,
+      margin,
+      color: 20,
+    });
+
+    y = addWrappedText(doc, closingName, margin, y + 8, usableWidth, {
+      fontStyle: "bold",
+      fontSize: 10.5,
+      lineHeight: 14,
+      pageHeight,
+      margin,
+      color: activeResumeStyle.accent,
+    });
+
+    doc.save(`cover-letter-${activeResumeStyle.id}.pdf`);
+  };
+
+  const downloadCoverLetterDOCX = async () => {
+    const docx = await import("docx");
+    const { saveAs } = await import("file-saver");
+    const letterData = await getCoverLetterDataForDownload();
+
+    if (!letterData) return;
+
+    const { contactInfo, greeting, letterBody, closingName } = letterData;
+    const contactLine = [
+      contactInfo.location,
+      contactInfo.phone,
+      contactInfo.email,
+      contactInfo.linkedin,
+    ]
+      .map((item) => cleanPdfText(item))
+      .filter(Boolean)
+      .join(" | ");
+
+    const paragraphs = letterBody
+      .split(/\n{2,}|(?<=\.)\s+(?=[A-Z])/)
+      .map((paragraph) => cleanPdfText(paragraph))
+      .filter(Boolean);
+
+    const children = [
+      createDocxParagraph(docx, cleanPdfText(contactInfo.fullName).toUpperCase(), {
+        bold: true,
+        size: 30,
+        after: 60,
+        color: activeResumeStyle.docxAccent,
+      }),
+      createDocxParagraph(docx, contactLine, {
+        size: 18,
+        after: 280,
+        color: "333333",
+      }),
+      createDocxParagraph(docx, greeting, {
+        size: 21,
+        after: 160,
+      }),
+      ...paragraphs.map((paragraph) =>
+        createDocxParagraph(docx, paragraph, {
+          size: 21,
+          after: 170,
+        })
+      ),
+      createDocxParagraph(docx, "Regards,", {
+        size: 21,
+        after: 100,
+      }),
+      createDocxParagraph(docx, closingName, {
+        bold: true,
+        size: 21,
+        after: 80,
+        color: activeResumeStyle.docxAccent,
+      }),
+    ];
+
+    const wordDocument = new docx.Document({
+      sections: [
+        {
+          properties: {
+            page: {
+              margin: {
+                top: 720,
+                right: 720,
+                bottom: 720,
+                left: 720,
+              },
+            },
+          },
+          children,
+        },
+      ],
+    });
+
+    const blob = await docx.Packer.toBlob(wordDocument);
+    saveAs(blob, `cover-letter-${activeResumeStyle.id}.docx`);
   };
 
   const tabs = [
@@ -1174,19 +1567,112 @@ function App() {
 
   const activeContent = getSectionContent(activeTab);
   const currentTab = tabDetails[activeTab];
+  const completedSections = getCompletedSectionCount();
+  const jobCharacterCount = jobDescription.trim().length;
 
   return (
     <div className="app">
+      <nav className="topbar">
+        <div className="brand-mark">
+          <span>RA</span>
+          <strong>Resume Agent</strong>
+        </div>
+        <div className="topbar-links" aria-label="Builder sections">
+          <button type="button" onClick={() => goToWorkspaceTab("analysis")}>
+            ATS Score
+          </button>
+          <button type="button" onClick={goToTemplates}>
+            Templates
+          </button>
+          <button type="button" onClick={() => goToWorkspaceTab("coverLetter")}>
+            Cover Letter
+          </button>
+        </div>
+      </nav>
+
       <header className="hero">
-        <div>
+        <div className="hero-copy">
           <p className="eyebrow">AI-Powered Job Application Assistant</p>
-          <h1>Job AI Agent</h1>
+          <h1>Build a job-ready resume in one focused workflow.</h1>
           <p className="subtitle">
-            Analyze job descriptions, tailor your resume, generate cover letters,
-            and prepare for interviews in one workflow.
+            Import your resume, match it to the role, choose a download style,
+            and generate the resume, cover letter, and recruiter talking points.
           </p>
+          <div className="hero-actions">
+            <button
+              type="button"
+              onClick={() =>
+                handleAction("job-agent", "Job Agent / All", "analysis")
+              }
+              disabled={loadingAction}
+            >
+              Generate Full Kit
+            </button>
+            <span>{completedSections}/4 sections ready</span>
+          </div>
+        </div>
+
+        <div className="builder-preview" aria-label="Resume builder preview">
+          <div className="resume-sheet">
+            <div className="sheet-header" />
+            <div className="sheet-line wide" />
+            <div className="sheet-line" />
+            <div className="sheet-section" />
+            <div className="sheet-line wide" />
+            <div className="sheet-line mid" />
+            <div className="sheet-section" />
+            <div className="sheet-bullets">
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+          <div className="preview-score">
+            <span>ATS Match</span>
+            <strong>
+              {getSummaryValue([
+                "matchScore",
+                "score",
+                "atsScore",
+                "fitScore",
+                "matchPercentage",
+              ])}
+            </strong>
+            <small>{activeResumeStyle.name}</small>
+          </div>
         </div>
       </header>
+
+      <section className="builder-steps" aria-label="Resume builder steps">
+        <article>
+          <span>1</span>
+          <div>
+            <h3>Import resume</h3>
+            <p>Upload a plain-text resume and keep the content honest.</p>
+          </div>
+        </article>
+        <article>
+          <span>2</span>
+          <div>
+            <h3>Add job target</h3>
+            <p>Paste the role description to drive ATS and recruiter fit.</p>
+          </div>
+        </article>
+        <article>
+          <span>3</span>
+          <div>
+            <h3>Generate with AI</h3>
+            <p>Create tailored resume, letter, strengths, gaps, and pitch.</p>
+          </div>
+        </article>
+        <article>
+          <span>4</span>
+          <div>
+            <h3>Download style</h3>
+            <p>Export PDF or Word in the format that fits the application.</p>
+          </div>
+        </article>
+      </section>
 
       <main className="dashboard">
         <section className="sidebar-card">
@@ -1202,6 +1688,10 @@ function App() {
               onChange={(e) => setJobDescription(e.target.value)}
               placeholder="Paste the full job description here..."
             />
+            <div className="input-meta">
+              <span>{jobCharacterCount.toLocaleString()} characters</span>
+              <span>{jobCharacterCount >= 50 ? "Ready to analyze" : "Add more detail"}</span>
+            </div>
           </div>
 
           <div className="form-group">
@@ -1220,6 +1710,42 @@ function App() {
               Current version supports .txt resume files. PDF and DOCX support
               can be added later.
             </p>
+          </div>
+
+          <div className="style-panel" id="resume-templates">
+            <div className="style-heading">
+              <div>
+                <div className="section-kicker">Resume Style</div>
+                <h3>Choose your template</h3>
+              </div>
+              <span>{activeResumeStyle.name}</span>
+            </div>
+            <div className="style-options">
+              {RESUME_STYLES.map((style) => (
+                <button
+                  key={style.id}
+                  type="button"
+                  className={
+                    resumeStyle === style.id ? "style-option active" : "style-option"
+                  }
+                  onClick={() => setResumeStyle(style.id)}
+                >
+                  <span
+                    className="style-swatch"
+                    style={{ background: style.accent }}
+                  />
+                  <span className="template-mini" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  <span>
+                    <strong>{style.name}</strong>
+                    <small>{style.description}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="actions">
@@ -1269,7 +1795,7 @@ function App() {
           </div>
         </section>
 
-        <section className="workspace-card">
+        <section className="workspace-card" id="results-workspace">
           <div className="workspace-header">
             <div>
               <p className="workspace-label">Application Package</p>
@@ -1324,6 +1850,29 @@ function App() {
             </div>
           </div>
 
+          <div className="progress-strip">
+            <div>
+              <span>Generation progress</span>
+              <strong>{completedSections} of 4 sections</strong>
+            </div>
+            <div className="progress-track">
+              <span style={{ width: `${(completedSections / 4) * 100}%` }} />
+            </div>
+          </div>
+
+          <div className="template-showcase">
+            <div>
+              <span>Selected download style</span>
+              <strong>{activeResumeStyle.name}</strong>
+              <p>{activeResumeStyle.description}</p>
+            </div>
+            <div className="showcase-docs" aria-hidden="true">
+              <span className="doc-card primary-doc" />
+              <span className="doc-card secondary-doc" />
+              <span className="doc-card tertiary-doc" />
+            </div>
+          </div>
+
           <div className="tabs professional-tabs">
             {tabs.map((tab) => (
               <button
@@ -1339,6 +1888,20 @@ function App() {
 
           {error && <div className="error">{error}</div>}
 
+          {result?.partialSuccess && getResultErrors().length > 0 && (
+            <div className="warning">
+              <strong>Some sections need another try.</strong>
+              <ul>
+                {getResultErrors().map((item, index) => (
+                  <li key={`${item.section || "section"}-${index}`}>
+                    {formatTitle(item.section || "Section")}:{" "}
+                    {item.error || "Generation failed."}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {!result && !error && !loadingAction && (
             <div className="empty-state">
               <h3>Your results will appear here</h3>
@@ -1352,8 +1915,11 @@ function App() {
           {loadingAction && (
             <div className="loading-card">
               <div className="spinner"></div>
-              <h3>Generating your result...</h3>
-              <p>This may take a few seconds depending on Gemini response time.</p>
+              <h3>{loadingAction} is running</h3>
+              <p>
+                The backend is analyzing the job description and resume with
+                AI. Larger inputs may take a minute or two.
+              </p>
             </div>
           )}
 
@@ -1366,36 +1932,50 @@ function App() {
                 </div>
 
                 {activeTab === "tailoredResume" && (
-                  <div className="download-actions">
-                    <button
-                      type="button"
-                      onClick={downloadTailoredResumePDF}
-                      disabled={!hasSection("tailoredResume")}
-                    >
-                      Download PDF
-                    </button>
+                  <div className="download-stack">
+                    <span>{activeResumeStyle.name} export</span>
+                    <div className="download-actions">
+                      <button
+                        type="button"
+                        onClick={downloadTailoredResumePDF}
+                        disabled={!hasSection("tailoredResume")}
+                      >
+                        Download PDF
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={downloadTailoredResumeDOCX}
-                      disabled={!hasSection("tailoredResume")}
-                    >
-                      Download Word
-                    </button>
+                      <button
+                        type="button"
+                        onClick={downloadTailoredResumeDOCX}
+                        disabled={!hasSection("tailoredResume")}
+                      >
+                        Download Word
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {/* {activeTab === "coverLetter" && (
-                  <div className="download-actions">
-                    <button type="button" disabled>
-                      Download PDF
-                    </button>
+                {activeTab === "coverLetter" && (
+                  <div className="download-stack">
+                    <span>Formatted letter export</span>
+                    <div className="download-actions">
+                      <button
+                        type="button"
+                        onClick={downloadCoverLetterPDF}
+                        disabled={!hasSection("coverLetter")}
+                      >
+                        Download PDF
+                      </button>
 
-                    <button type="button" disabled>
-                      Download Word
-                    </button>
+                      <button
+                        type="button"
+                        onClick={downloadCoverLetterDOCX}
+                        disabled={!hasSection("coverLetter")}
+                      >
+                        Download Word
+                      </button>
+                    </div>
                   </div>
-                )} */}
+                )}
               </div>
 
               <div className="result-content">
