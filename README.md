@@ -106,7 +106,7 @@ Start Command: npm start
 
 ```bash
 GEMINI_API_KEY=your_real_api_key
-FRONTEND_URL=https://hassan2163.github.io
+FRONTEND_URL=Front end URL
 ```
 
 Render provides `PORT` automatically. The backend already uses `process.env.PORT || 5000`.
