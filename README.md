@@ -18,24 +18,21 @@ Hosted on Render
 
 ## Screenshots
 
-Place your screenshots inside a folder named `screenshots/` in the root of this GitHub repository.
+### Home / Landing Page
 
-Expected screenshot folder structure:
+![Home / Landing Page](screenshots/home-page.png)
 
-```txt
-screenshots/
-|-- home-page.png
-|-- job-analysis.png
-|-- ai-output.png
-`-- interview-prep.png
-```
+### Job Description Analysis
 
-Suggested screenshots:
+![Job Description Analysis](screenshots/job-analysis.png)
 
-- Home / Landing Page
-- Job Description Analysis
-- AI Generated Resume / Cover Letter Output
-- Interview Preparation Output
+### AI Generated Resume / Cover Letter Output
+
+![AI Generated Resume / Cover Letter Output](screenshots/ai-output.png)
+
+### Interview Preparation Output
+
+![Interview Preparation Output](screenshots/interview-prep.png)
 
 ---
 
