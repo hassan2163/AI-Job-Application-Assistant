@@ -1602,7 +1602,7 @@ function App() {
             <button
               type="button"
               onClick={() =>
-                handleAction("job-agent", "Job Agent / All", "analysis")
+                handleAction("job-agent", "Generate Full Kit", "analysis")
               }
               disabled={loadingAction}
             >
@@ -1786,11 +1786,11 @@ function App() {
             <button
               className="primary"
               onClick={() =>
-                handleAction("job-agent", "Job Agent / All", "analysis")
+                handleAction("job-agent", "Generate Full Kit", "analysis")
               }
               disabled={loadingAction}
             >
-              Job Agent / All
+              Generate Full Kit
             </button>
           </div>
         </section>
@@ -1906,7 +1906,7 @@ function App() {
             <div className="empty-state">
               <h3>Your results will appear here</h3>
               <p>
-                Start with Analyze CV or use Job Agent / All to generate the
+                Start with Analyze CV or use Generate Full Kit to generate the
                 complete application package.
               </p>
             </div>
@@ -1985,7 +1985,7 @@ function App() {
                   <div className="empty-section">
                     <h3>No content in this section yet</h3>
                     <p>
-                      Run the related action button or use Job Agent / All to
+                      Run the related action button or use Generate Full Kit to
                       generate this section.
                     </p>
                   </div>
