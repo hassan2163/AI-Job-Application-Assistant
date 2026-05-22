@@ -94,7 +94,8 @@ AI-Job-Application-Assistant/
 |   |-- public/
 |   |-- package.json
 |   |-- vite.config.js
-|   `-- .env.production
+|   |-- .env.example
+|   `-- .env.production.example
 |
 |-- Backend/
 |   |-- app.js
@@ -105,7 +106,8 @@ AI-Job-Application-Assistant/
 |-- screenshots/
 |   |-- home-page.png
 |   |-- job-analysis.png
-|   |-- ai-output.png
+|   |-- tailored-resume.png
+|   |-- cover-letter.png
 |   `-- interview-prep.png
 |
 |-- .github/
@@ -154,7 +156,7 @@ Create a `.env.example` file inside the `Backend/` folder:
 
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
-FRONTEND_URL=https://hassan2163.github.io
+FRONTEND_URL=https://your-github-username.github.io
 PORT=5000
 ```
 
@@ -175,7 +177,13 @@ VITE_API_URL=https://your-render-backend-url.onrender.com
 Example:
 
 ```env
-VITE_API_URL=https://ai-job-application-assistant.onrender.com
+VITE_API_URL=https://your-backend-url.onrender.com
+```
+
+For local development, create a `.env` file inside the `frontend/` folder:
+
+```env
+VITE_API_URL=http://localhost:5000
 ```
 
 ---
@@ -237,6 +245,12 @@ https://hassan2163.github.io/AI-Job-Application-Assistant/
 
 The backend is deployed on Render as a web service.
 
+The backend can also be deployed to any Node-compatible hosting provider. After deployment, set the frontend environment variable to your hosted backend URL:
+
+```env
+VITE_API_URL=https://your-backend-url.onrender.com
+```
+
 Render configuration:
 
 ```txt
@@ -249,7 +263,7 @@ Required Render environment variables:
 
 ```env
 GEMINI_API_KEY=your_real_gemini_api_key
-FRONTEND_URL=https://hassan2163.github.io
+FRONTEND_URL=https://your-github-username.github.io
 ```
 
 ---
