@@ -26,9 +26,13 @@ Hosted on Render
 
 ![Job Description Analysis](screenshots/job-analysis.png)
 
-### AI Generated Resume / Cover Letter Output
+### Tailored Resume Output
 
-![AI Generated Resume / Cover Letter Output](screenshots/ai-output.png)
+![Tailored Resume Output](screenshots/tailored-resume.png)
+
+### Cover Letter Output
+
+![Cover Letter Output](screenshots/cover-letter.png)
 
 ### Interview Preparation Output
 
