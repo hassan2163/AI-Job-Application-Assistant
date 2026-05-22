@@ -1,54 +1,210 @@
 # AI Job Application Assistant
 
-AI Job Application Assistant is a full-stack AI-powered web application that helps job seekers analyze job descriptions, evaluate resume fit, and generate tailored job application materials.
+A full-stack AI-powered job application assistant that helps job seekers analyze job descriptions, evaluate resume fit, and generate tailored ATS-style resume content, cover letters, and interview preparation guidance.
 
-The application is designed to support users during the job search process by producing ATS-friendly resume content, personalized cover letters, job match analysis, and interview preparation guidance based on a target job description and candidate resume.
+The application uses a React/Vite frontend, Node.js/Express backend, and Google Gemini API to provide job-fit analysis, application recommendations, resume tailoring, and career preparation support.
+
+---
+
+## Live Demo
+
+**Frontend:**  
+https://hassan2163.github.io/AI-Job-Application-Assistant/
+
+**Backend:**  
+Hosted on Render
+
+---
+
+## Screenshots
+
+Place your screenshots inside a folder named `screenshots/` in the root of this GitHub repository.
+
+Expected screenshot folder structure:
+
+```txt
+screenshots/
+|-- home-page.png
+|-- job-analysis.png
+|-- ai-output.png
+`-- interview-prep.png
+```
+
+Suggested screenshots:
+
+- Home / Landing Page
+- Job Description Analysis
+- AI Generated Resume / Cover Letter Output
+- Interview Preparation Output
 
 ---
 
 ## Features
 
-- Analyze job descriptions against a candidate resume
-- Generate job match score and fit recommendation
-- Identify strengths, gaps, and missing keywords
-- Generate tailored ATS-friendly resume content
-- Generate personalized cover letters
-- Generate interview preparation questions and talking points
-- Download tailored resume as a Word document
-- Clean frontend dashboard for reviewing generated results
-- Backend API built with Node.js and Express
-- AI response handling with structured JSON output
+- Analyze job descriptions against a candidate profile or resume
+- Generate job match score and fit analysis
+- Provide Apply / Apply with Caution / Skip recommendations
+- Generate ATS-style tailored resume content
+- Create concise cover letters
+- Generate interview preparation guidance
+- Identify strengths, gaps, and transferable skills
+- Export generated content to PDF or DOCX
+- Secure Gemini API integration through backend
+- Deployed frontend using GitHub Pages
+- Deployed backend using Render
 
 ---
 
 ## Tech Stack
 
 ### Frontend
-- React.js
+
+- React
 - Vite
 - JavaScript
-- CSS
+- HTML/CSS
+- GitHub Pages
 
 ### Backend
+
 - Node.js
 - Express.js
-- Axios
-- AI model integration
-- File upload-based resume input
+- Google Gemini API
+- Render
+
+### Other Tools
+
+- GitHub Actions
+- CORS
+- Helmet
+- Rate limiting
+- File upload handling
+- PDF/DOCX export
+
+---
+
+## Project Structure
+
+```txt
+AI-Job-Application-Assistant/
+|
+|-- frontend/
+|   |-- src/
+|   |-- public/
+|   |-- package.json
+|   |-- vite.config.js
+|   `-- .env.production
+|
+|-- Backend/
+|   |-- app.js
+|   |-- package.json
+|   |-- .env.example
+|   `-- other backend files
+|
+|-- screenshots/
+|   |-- home-page.png
+|   |-- job-analysis.png
+|   |-- ai-output.png
+|   `-- interview-prep.png
+|
+|-- .github/
+|   `-- workflows/
+|
+|-- .gitignore
+|-- render.yaml
+`-- README.md
+```
+
+---
+
+## How It Works
+
+1. User enters or uploads resume/profile information.
+2. User pastes a target job description.
+3. Frontend sends the request to the Express backend.
+4. Backend securely calls the Gemini API.
+5. Gemini analyzes the resume against the job description.
+6. The app returns:
+   - Match score
+   - Application recommendation
+   - Resume improvement suggestions
+   - Tailored resume content
+   - Cover letter
+   - Interview preparation guidance
+
+---
+
+## AI Output Focus
+
+The assistant is designed to generate practical and honest job application guidance. It focuses on:
+
+- Matching real resume experience with job requirements
+- Highlighting direct and transferable skills
+- Identifying missing or weak areas
+- Avoiding fabricated experience, fake tools, or false metrics
+- Creating ATS-friendly language
+- Helping users decide whether a job is worth applying to
+
+---
+
+## Environment Variables
+
+Create a `.env.example` file inside the `Backend/` folder:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+FRONTEND_URL=https://hassan2163.github.io
+PORT=5000
+```
+
+For local development, create a real `.env` file inside the `Backend/` folder and add your actual Gemini API key.
+
+Do not commit the real `.env` file to GitHub.
+
+---
+
+## Frontend Environment Setup
+
+For production, create a `.env.production` file inside the `frontend/` folder:
+
+```env
+VITE_API_URL=https://your-render-backend-url.onrender.com
+```
+
+Example:
+
+```env
+VITE_API_URL=https://ai-job-application-assistant.onrender.com
+```
 
 ---
 
 ## Local Development
 
-Run the backend:
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/hassan2163/AI-Job-Application-Assistant.git
+cd AI-Job-Application-Assistant
+```
+
+### 2. Run the backend
 
 ```bash
 cd Backend
 npm install
-npm run dev
+npm start
 ```
 
-Run the frontend:
+The backend should run locally on:
+
+```txt
+http://localhost:5000
+```
+
+### 3. Run the frontend
+
+Open a new terminal:
 
 ```bash
 cd frontend
@@ -56,83 +212,88 @@ npm install
 npm run dev
 ```
 
-Frontend local environment:
+The frontend should run locally on:
 
-```bash
-VITE_API_URL=http://localhost:5000
-```
-
-Backend local environment:
-
-```bash
-PORT=5000
-FRONTEND_URL=http://localhost:5173
-GEMINI_API_KEY=your_api_key_here
+```txt
+http://localhost:5173
 ```
 
 ---
 
 ## Deployment
 
-Recommended MVP deployment:
+### Frontend Deployment
 
-- Frontend: GitHub Pages
-- Backend: Render Web Service
+The frontend is deployed using GitHub Pages.
 
-GitHub Pages frontend:
+Production frontend URL:
 
-1. In GitHub, set repository secret `VITE_API_URL` to your Render backend URL.
-2. Example:
-
-```bash
-VITE_API_URL=https://your-render-backend.onrender.com
+```txt
+https://hassan2163.github.io/AI-Job-Application-Assistant/
 ```
 
-3. Enable GitHub Pages with GitHub Actions as the source.
-4. Push to `main`. The workflow in `.github/workflows/deploy-frontend.yml` builds and deploys `frontend/dist`.
+### Backend Deployment
 
-Render backend:
+The backend is deployed on Render as a web service.
 
-1. Create a new Render Web Service from this repo.
-2. Use the included `render.yaml` blueprint or configure manually:
+Render configuration:
 
-```bash
+```txt
 Root Directory: Backend
 Build Command: npm install
 Start Command: npm start
 ```
 
-3. Add Render environment variables:
+Required Render environment variables:
 
-```bash
-GEMINI_API_KEY=your_real_api_key
-FRONTEND_URL=Front end URL
+```env
+GEMINI_API_KEY=your_real_gemini_api_key
+FRONTEND_URL=https://hassan2163.github.io
 ```
-
-Render provides `PORT` automatically. The backend already uses `process.env.PORT || 5000`.
 
 ---
 
-## Project Structure
+## Security Notes
 
-```bash
-AI Job Application Assistant/
-│
-├── backend/
-│   ├── controllers/
-│   ├── routes/
-│   ├── services/
-│   ├── data/
-│   │   └── resume.txt
-│   ├── app.js
-│   ├── package.json
-│   └── .env
-│
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── package.json
-│   └── vite.config.js
-│
-└── README.md
+- Gemini API key is stored only on the backend.
+- Frontend does not expose secret keys.
+- Backend includes CORS configuration.
+- Backend uses rate limiting to reduce abuse.
+- Uploaded resume files are validated.
+- `.env` files are excluded from GitHub.
+- Production environment variables are managed through Render.
+
+---
+
+## Future Improvements
+
+- Add user authentication
+- Save job application history
+- Add multiple resume profiles
+- Add advanced resume templates
+- Add LinkedIn message generator
+- Add recruiter outreach email generator
+- Add application tracker dashboard
+- Add Stripe payment integration
+- Add premium plan support
+- Add mobile/PWA support
+
+---
+
+## Purpose of the Project
+
+This project was built as a practical AI-powered career assistant and portfolio project. It demonstrates full-stack development, AI API integration, frontend/backend deployment, prompt engineering, environment variable security, and product thinking around job search automation.
+
+The project also reflects a real-world use case: helping job seekers evaluate opportunities, tailor their applications, and prepare more confidently for the hiring process.
+
+---
+
+## Author
+
+Muhammad Hassan Khan
+
+**GitHub:**  
+https://github.com/hassan2163
+
+**Live Project:**  
+https://hassan2163.github.io/AI-Job-Application-Assistant/
